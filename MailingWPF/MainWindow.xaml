@@ -1,0 +1,53 @@
+﻿ <Window x:Class="MailingWPF.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:MailingWPF"
+        mc:Ignorable="d"
+        Title="Mail Files" Height="650" Width="800">
+
+    <StackPanel Margin="10">
+        <TextBlock Text="Files that will be sent:" Margin="5"></TextBlock>
+        <ListBox x:Name ="FileBox" 
+                Height="200"
+                ItemsSource="{Binding FileList}" 
+                DisplayMemberPath="fileName" 
+                AllowDrop="True" 
+                Drop="dropfiles">
+        </ListBox>
+        <Grid>
+            <Button HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0, 5" Padding="10,2,10,3" Height="25"
+                Name="DeleteButton" Click="DeleteButton_Click">
+                Delete Item</Button>
+            <CheckBox IsChecked="True" HorizontalAlignment="Right" VerticalAlignment="Top" VerticalContentAlignment="Center"
+                      Margin="90, 5" Padding="10,2,10,3" Height="25" x:Name="DeleteFilesBox"> Delete Once Sent</CheckBox>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Width="520"  Height="60" HorizontalAlignment="Left">
+                <StackPanel>
+                    <TextBlock x:Name ="FileMessage" Text="" Margin="5,5,0,5" Padding="0,10,0,0" 
+                    HorizontalAlignment="Left" Width="500" 
+                    TextWrapping="Wrap" TextAlignment="Left"
+                    Foreground="DarkRed"></TextBlock>
+                </StackPanel>
+            </ScrollViewer>
+
+        </Grid>
+
+        <TextBlock Text="Mail's body:" Margin="5" Padding="0,10,0,0"></TextBlock>
+        <TextBox Name="CustomText" Height="200" AcceptsReturn="True" TextWrapping="Wrap"/>
+        <Grid>
+            <Button HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0, 5" Padding="10,2,10,3" Height="25"
+                Click="Button_Click">Send</Button>
+            <ScrollViewer Width="550" Height="50" HorizontalAlignment="Left" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock x:Name ="Message" Text="" Margin="5,5,0,5" Padding="0,10,0,0" 
+                        HorizontalAlignment="Left" Width="500"
+                        TextWrapping="Wrap" TextAlignment="Left"
+                        Foreground="DarkRed"></TextBlock>
+                </StackPanel>
+            </ScrollViewer>
+
+
+        </Grid>
+    </StackPanel>
+</Window>

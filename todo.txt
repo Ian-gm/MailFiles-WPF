@@ -1,0 +1,5 @@
++3-Once I click enter, close the window and send the email in the background, just show me a message only if it fails
+
+1- It should be able to handle multiple selected files at once when opening the program via right-click context menu (this has always been a complicated topic that can easily be solved by adding the context menu option to the "Send To" submenu, but I'll do my best)
+
+6- Also, the first dialog box "Now opening file:" should disappear
