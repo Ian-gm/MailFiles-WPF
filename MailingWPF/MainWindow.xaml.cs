@@ -20,6 +20,10 @@ using System.Windows.Navigation;
 using System.Xml.Linq;
 using static MailingWPF.MainWindow;
 using SevenZip;
+using static System.Net.Mime.MediaTypeNames;
+using System.Windows.Forms;
+using Microsoft.VisualBasic;
+using MailingWPF.Properties;
 
 namespace MailingWPF
 {
@@ -31,15 +35,17 @@ namespace MailingWPF
     {
         public ObservableCollection<ChosenFile> FileList { get; set; }
 
+        public string[] senderData;
+        public string recipientAdress;
+
         public MainWindow()
         {
             FileList = new ObservableCollection<ChosenFile>();
             InitializeComponent();
             this.DataContext = this;
+            Rotulo.Text = "by Mutable Substance: mutable.substance@gmail.com";
 
-            //FileMessage.Text = Path.Combine(AppContext.BaseDirectory, "7z.dll") + Path.Combine(AppContext.BaseDirectory, "7z.dll") + Path.Combine(AppContext.BaseDirectory, "7z.dll") + Path.Combine(AppContext.BaseDirectory, "7z.dll");
-
-            string[] args = Environment.GetCommandLineArgs();
+            string[] args = Environment.GetCommandLineArgs(); //Si el programa fue abierto con context menu, leer el archivo seleccionado
             foreach (string s in args)
             {
                 if (!Path.GetFileName(s).EndsWith(".dll"))
@@ -48,9 +54,70 @@ namespace MailingWPF
                     FileList.Add(new ChosenFile(s, fileName));
                 }
             }
+
+            //READ ALL .TXT FILES
+            string appPath = AppContext.BaseDirectory;
+            string appPathPrevious = Directory.GetParent(appPath).Parent.FullName;
+            string credentialsPath = Path.Combine(appPathPrevious, @"Credentials.txt");
+            string recipientPath = Path.Combine(appPathPrevious, @"Recipient.txt");
+
+            if (!File.Exists(credentialsPath))
+            {
+                StatusMessage.Text = "Couldn't find Credentials.txt in the path: " + credentialsPath + "\r\n" + "\r\n";
+                StatusMessage.Text += "Please create the file and add the information as follows: " + "\r\n";
+                StatusMessage.Text += "name: Sender's Name " + "\r\n";
+                StatusMessage.Text += "from: sender's@gmail.com " + "\r\n";
+                StatusMessage.Text += "password: gmail app password " + "\r\n";
+                StatusMessage.Text += "\r\n";
+                SendButton.IsEnabled = false;
+            }
+            else
+            {
+                try
+                {
+                    senderData = getCredentials(credentialsPath);
+                }
+                catch (Exception e)
+                {
+                    StatusMessage.Text = "Couldn't read the Credentials.txt, error message:" + "\r\n" + e.Message;
+                    SendButton.IsEnabled = false;
+                }
+
+                StatusMessage.Text = "Credentials read successfully" + "\r\n";
+            }
+
+            if (!File.Exists(recipientPath))
+            {
+                StatusMessage.Text = "Couldn't find Recipient.txt in the path: " + recipientPath;
+                StatusMessage.Text += "Please create the file and add the information as follows: " + "\r\n";
+                StatusMessage.Text += "recipient's@gmail.com " + "\r\n";
+                WindowState = WindowState.Normal;
+            }
+            else
+            {
+                try
+                {
+                    recipientAdress = System.IO.File.ReadAllText(recipientPath);
+                }
+                catch (Exception e)
+                {
+                    StatusMessage.Text = "Couldn't read the Recipient.txt, error message:" + "\r\n" + e.Message;
+                }
+
+                StatusMessage.Text += "Recipient's mail adress read successfully";
+
+                Recipient.Text = recipientAdress;
+            }
+
+            string chosenFolder = Properties.Settings.Default.CopyFolder;
+
+            if (chosenFolder != null )
+            {
+                ChosenFolder.Text = "Folder: " + Path.GetFileName(chosenFolder);
+            }
         }
 
-        public class ChosenFile
+        public class ChosenFile //Este objeto guarda la información de los archivos seleccionados
         {
             public ChosenFile(string Path, string Name)
             {
@@ -61,13 +128,13 @@ namespace MailingWPF
             public string fileName { get; set; }
         }
 
-        private void dropfiles(object sender, DragEventArgs e)
+        private void dropfiles(object sender, System.Windows.DragEventArgs e) //Esta es la función que recibe archivos por drag n drop
         {
             string[] droppedFiles = null;
 
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
             {
-                droppedFiles = e.Data.GetData(DataFormats.FileDrop, true) as string[];
+                droppedFiles = e.Data.GetData(System.Windows.DataFormats.FileDrop, true) as string[];
             }
 
             if ((null == droppedFiles) || (!droppedFiles.Any())) { return; }
@@ -78,11 +145,80 @@ namespace MailingWPF
 
                 FileList.Add(new ChosenFile(s, fileName));
             }
+
+            SelectedFilesTotalSize();
+        }
+
+        private void SelectedFilesTotalSize()
+        {
+            long totalSize = 0;
+            foreach (ChosenFile chosenFile in FileList)
+            {
+                totalSize += new FileInfo(chosenFile.filePath).Length;
+            }
+
+            double toMb = Math.Round((double)(totalSize) / 1000000, 2);
+            Totalfilesize.Text = toMb.ToString() + "mb";
+            if (toMb > 25)
+            {
+                Totalfilesize.Foreground = new SolidColorBrush(Colors.Red);
+                Totalfilesize.Text += "\r\n" + "Zip file may be too large";
+            }
+            else
+            {
+                Totalfilesize.Foreground = new SolidColorBrush(Colors.Black);
+            }
+        }
+        private string[] getCredentials(string credentialsPath)
+        {
+            string[] credentialsText;
+            try
+            {
+                credentialsText = System.IO.File.ReadAllLines(credentialsPath);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage.Text = "Recipient data was successfully read" + "\r\n";
+                WindowState = WindowState.Normal;
+                throw;
+            }
+            string senderName = credentialsText[0].Split(':', 2)[1].Trim();
+            string senderAdress = credentialsText[1].Split(':', 2)[1].Trim();
+            string password = credentialsText[2].Split(':', 2)[1].Trim();
+
+            string[] senderData = new string[] { senderName, senderAdress, password };
+            return senderData;
+        }
+
+        private void Recipient_TextChanged(object sender, TextChangedEventArgs e)
+        {
+           recipientAdress = Recipient.Text;
         }
 
         //Interface
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private void SendButton_Click(object sender, RoutedEventArgs e) //Este botón zipea los archivos y envía el mail
         {
+
+            foreach (ChosenFile chosenFile in FileList)
+            {
+                int sameCount = 0;
+                string fileName = chosenFile.fileName;
+                foreach (ChosenFile otherFile in FileList)
+                {
+                    if(fileName == otherFile.fileName)
+                    {
+                        sameCount++;
+                    }
+                }
+                if (sameCount > 1)
+                {
+                    StatusMessage.Text = "Some selected files are named the same, please rename them in order to continue";
+                    return;
+                }
+            }
+
+
+
 
             WindowState = WindowState.Minimized;
 
@@ -95,15 +231,14 @@ namespace MailingWPF
             }
             catch(Exception exep)
             {
-                FileMessage.Text = $"Zip Failed: {exep}";
+                StatusMessage.Text = $"Zip Failed: {exep}";
                 WindowState = WindowState.Normal;
                 return;
             }
 
-
             if (zipFile == "toobig")
             {
-                FileMessage.Text = "The Zip File is larger than 25mb";
+                StatusMessage.Text = "The Zip File is larger than 25mb";
                 WindowState = WindowState.Normal;
                 return;
             }
@@ -114,58 +249,35 @@ namespace MailingWPF
             string permanentMessage = "If any file is denoted with 'HR' in the filename, it is intended for High-Resolution print.";
             int count = 0;
 
+            MailBody += CustomText.Text + "\r\n";
+            MailBody += "\r\n";
+
             MailBody += "The attached zip file contains " + FileList.Count.ToString() + " files:" + "\r\n";
 
             foreach (ChosenFile chosenFile in FileList)
             {
                 string path = chosenFile.filePath;
                 string fileName = chosenFile.fileName;
-                string extension = Path.GetExtension(path);
-                string fileNameNoExt = fileName.Substring(0, fileName.Length - extension.Length);
 
-                MailSubject += fileNameNoExt;
+                MailSubject += fileName;
                 if (count < FileList.Count - 1)
                 {
                     MailSubject += "_";
                 }
-                MailBody += fileNameNoExt;
+                MailBody += fileName;
                 MailBody += "\r\n";
 
-                count ++;
+                count++;
             }
 
-            MailBody += "\r\n";
-            MailBody += CustomText.Text + "\r\n";
             MailBody += "\r\n";
             MailBody += permanentMessage + "\r\n";
 
-            //GET CREDENTIALS
-            string appPath = AppContext.BaseDirectory;
-            string appPathPrevious = Directory.GetParent(appPath).Parent.FullName;
-            string credentialsPath = Path.Combine(appPathPrevious, @"Credentials.txt");
 
-            if (!File.Exists(credentialsPath))
-            {
-                Message.Text = "Couldn't find Credentials.txt in the path: " + credentialsPath;
-                WindowState = WindowState.Normal;
-                return;
-            }
-            string[] credentialsText = System.IO.File.ReadAllLines(credentialsPath);
-
-            string senderName = credentialsText[0].Split(':', 2)[1].Trim();
-            string senderAdress = credentialsText[1].Split(':', 2)[1].Trim();
-            string password = credentialsText[2].Split(':', 2)[1].Trim();
-
-            //GET RECIPIENT ADRESS
-            string recipientPath = Path.Combine(appPathPrevious, @"Recipient.txt");
-            if (!File.Exists(recipientPath))
-            {
-                Message.Text = "Couldn't find Recipient.txt in the path: " + recipientPath;
-                WindowState = WindowState.Normal;
-                return;
-            }
-
-            string recipientAdress = System.IO.File.ReadAllText(recipientPath);
+            //CREATE MAIL
+            string senderName = senderData[0];
+            string senderAdress = senderData[1];
+            string password = senderData[2];
 
             NetworkCredential credentials = new NetworkCredential(senderAdress, password);
 
@@ -197,16 +309,56 @@ namespace MailingWPF
             }
             catch (Exception ex)
             {
-                Message.Text = "Mail failed: " + ex.Message;
+                StatusMessage.Text = "Mail failed: " + ex.Message;
                 WindowState = WindowState.Normal;
                 return;
             }
 
             mail.Dispose();
 
-            //File.Delete(zipFile);
-            Message.Text = "Mail sent successfully";
+            StatusMessage.Text = "Mail sent successfully";
 
+            //COPIAR ARCHIVOS
+            if ((bool)CopyFilesBox.IsChecked)
+            {
+                string Folder = Properties.Settings.Default.CopyFolder;
+
+                if(Folder == null)
+                {
+                    string appPath = AppContext.BaseDirectory;
+                    string rootPath = Directory.GetParent(appPath).Root.FullName;
+                    Folder = Path.Combine(rootPath, "SelectedFiles");
+                    Properties.Settings.Default.CopyFolder = Folder;
+                    Properties.Settings.Default.Save();
+                }
+
+                if(!Directory.Exists(Folder))
+                {
+                    Directory.CreateDirectory(Folder);
+                }
+
+                foreach (ChosenFile chosenFile in FileList)
+                {
+                    if (File.Exists(chosenFile.filePath))
+                    {
+                        string fileName = Path.GetFileName(chosenFile.filePath);
+                        string finalPath = Path.Combine(Folder, fileName);
+                        try
+                        {
+                            File.Copy(chosenFile.filePath, finalPath);
+                        }
+                        catch (IOException ex)
+                        {
+                            StatusMessage.Text = ex.Message;
+                        }
+                    }
+                }
+
+                WindowState = WindowState.Normal;
+                System.Windows.MessageBox.Show("Files were copied to: " + Folder.ToString());
+            }
+
+            //BORRAR ARCHIVOS
             if ((bool)DeleteFilesBox.IsChecked)
             {
                 foreach(ChosenFile chosenFile in FileList)
@@ -226,9 +378,8 @@ namespace MailingWPF
                 }
                 catch (Exception ex)
                 {
-                    Message.Text = "Couldn't delete .zip File: " + ex.Message;
+                    StatusMessage.Text = "Couldn't delete .zip File: " + ex.Message;
                     WindowState = WindowState.Normal;
-                    return;
                 }
             }
 
@@ -238,28 +389,58 @@ namespace MailingWPF
         private void DeleteButton_Click(object sender, RoutedEventArgs e)
         {
             int index = FileBox.SelectedIndex;
-            FileList.RemoveAt(index);
-            FileMessage.Text = "";
-            //this.FileBox.Items.Refresh();
+            try
+            {
+                FileList.RemoveAt(index);
+            }
+            catch(Exception ex)
+            {
+                StatusMessage.Text = "Failed to remove file from list, are you sure you clicked on a file before clicking on this button?";
+            }
+
+            SelectedFilesTotalSize();
         }
 
-        static string ReduceName(string path, ObservableCollection<ChosenFile> FileList)
+        private void ChooseFolder_Click(object sender, RoutedEventArgs e)
         {
-            string fileName = Path.GetFileName(path);
-            string extension = Path.GetExtension(path);
+            using (var fbd = new FolderBrowserDialog())
+            {
+                DialogResult result = fbd.ShowDialog();
+
+                string chosenFolder = fbd.SelectedPath;
+                Properties.Settings.Default.CopyFolder = chosenFolder;
+                Properties.Settings.Default.Save();
+
+                ChosenFolder.Text = "Folder: " + Path.GetFileName(chosenFolder);
+                StatusMessage.Text = "Chosen folder to copy the selected files: " + chosenFolder;
+            }
+        }
+
+        //RECORTA EL NOMBRE DE LOS ARCHIVOS
+        static string ReduceName(string path, ObservableCollection<ChosenFile> FileList) 
+        {
+            string prevfileName = null;
+            string fileName;
             string fileNameNoExt = Path.GetFileNameWithoutExtension(path);
 
             string[] splitFileName = fileNameNoExt.Split('-');
             if (splitFileName.Length > 2)
             {
-                fileName = splitFileName[1] + extension;
-                fileNameNoExt = splitFileName[1];
+                prevfileName = splitFileName[0];
+                fileName = splitFileName[1];
+            }
+            else if (fileNameNoExt.Length > 6)
+            {
+                fileName = fileNameNoExt.Substring(0,6);
+            }
+            else
+            {
+                fileName = fileNameNoExt;
             }
 
             bool exists = true;
-            int suffix = 0;
+            int suffix = -1;
             string ofileName = fileName;
-            string ofileNameNoExt = fileNameNoExt;
 
             while (exists)
             {
@@ -267,12 +448,28 @@ namespace MailingWPF
 
                 foreach (ChosenFile file in FileList)
                 {
-                    if(!(0==suffix))
+                    if (suffix == -1) 
                     {
-                        fileNameNoExt = ofileNameNoExt;
-                        fileNameNoExt += "-" + suffix.ToString();
-                        fileName = fileNameNoExt + extension;
+                        fileName = ofileName;
                     }
+                    else if (suffix == 0) 
+                    {
+                        if (prevfileName != null)
+                        {
+                            fileName = ofileName;
+                            fileName = prevfileName + "-" + fileName;
+                        }
+                    }
+                    else
+                    {
+                        fileName = ofileName;
+                        if (prevfileName != null)
+                        {
+                            fileName = prevfileName + "-" + fileName;
+                        }
+                        fileName += " (" + suffix.ToString() + ")";
+                    }
+
                     if(file.fileName == fileName)
                     {
                         exists = true;
@@ -315,12 +512,11 @@ namespace MailingWPF
             foreach (ChosenFile chosenFile in FileList)
             {
                 string path = chosenFile.filePath;
-
-                string newPath = Path.Combine(zipFolder, chosenFile.fileName);
+                string newPath = Path.Combine(zipFolder, chosenFile.fileName + Path.GetExtension(chosenFile.filePath));
 
                 try
                 {
-                    System.IO.File.Copy(chosenFile.filePath, newPath);
+                    System.IO.File.Copy(path, newPath);
                 }
                 catch (Exception ex)
                 {
